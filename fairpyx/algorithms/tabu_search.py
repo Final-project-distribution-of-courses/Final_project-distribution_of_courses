@@ -35,7 +35,7 @@ coloredlogs.install(level='DEBUG', logger=logger, fmt='%(message)s', level_style
 
 
 # ---------------------The main function---------------------
-def tabu_search(alloc: AllocationBuilder, initial_budgets: dict, beta: float, delta: set):
+def tabu_search(alloc: AllocationBuilder, initial_budgets: dict, beta: float, delta: set, check_history: bool = True):
     """
     ALGORITHM 3: Tabu search
 
@@ -114,7 +114,7 @@ def tabu_search(alloc: AllocationBuilder, initial_budgets: dict, beta: float, de
     max_utilities_allocations = student_best_bundles(prices.copy(), alloc.instance, initial_budgets)
     allocation, excess_demand_vector, norma = min_excess_demand_for_allocation(alloc.instance, prices,
                                                                                max_utilities_allocations)
-    #check the branch ****************
+
     while norma:
         logger.debug(f"min excess demand: {excess_demand_vector}")
         logger.debug(f"prices: {prices}")
@@ -126,8 +126,10 @@ def tabu_search(alloc: AllocationBuilder, initial_budgets: dict, beta: float, de
             break
 
         logger.info("3) Otherwise, include all equivalent prices of 𝒑 into the history: H ← H + {𝒑′ : 𝒑′ ∼𝑝 𝒑}")
-        equivalent_prices = find_all_equivalent_prices(alloc.instance, initial_budgets, allocation)
-        history.append(equivalent_prices)
+        if check_history:
+            equivalent_prices = find_all_equivalent_prices(alloc.instance, initial_budgets, allocation)
+            history.append(equivalent_prices)
+
         neighbors = find_all_neighbors(alloc.instance, history, prices, delta, excess_demand_vector,
                                        initial_budgets,
                                        allocation)

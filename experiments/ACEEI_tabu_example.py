@@ -7,10 +7,13 @@ Since: 2023-07
 
 ######### COMMON VARIABLES AND ROUTINES ##########
 
+import time
 from fairpyx import divide, AgentBundleValueMatrix, Instance
 import fairpyx.algorithms as crs
 from typing import *
 import numpy as np
+import matplotlib.pyplot as plt
+
 
 max_value = 1000
 normalized_sum_of_values = 1000
@@ -67,10 +70,9 @@ def create_initial_budgets(num_of_agents: int, beta: float) -> dict:
     initial_budgets = np.random.uniform(1, 1 + beta, num_of_agents)
     return {f's{agent + 1 }': initial_budgets[agent] for agent in range(num_of_agents)}
 
-def evaluate_algorithm_on_instance(algorithm, instance, beta, delta):
+def evaluate_algorithm_on_instance(algorithm, instance, beta, delta, check_history=True):
     initial_budgets = create_initial_budgets(instance.num_of_agents, beta)
-    # Assuming the algorithm takes beta and delta as arguments
-    allocation = divide(algorithm, instance, initial_budgets=initial_budgets, beta=beta, delta=set(delta))
+    allocation = divide(algorithm, instance, initial_budgets=initial_budgets, beta=beta, delta=set(delta), check_history=check_history)
     matrix = AgentBundleValueMatrix(instance, allocation)
     matrix.use_normalized_values()
     return {
@@ -88,11 +90,11 @@ def evaluate_algorithm_on_instance(algorithm, instance, beta, delta):
 ######### EXPERIMENT WITH UNIFORMLY-RANDOM DATA ##########
 
 def course_allocation_with_random_instance_uniform(
-    num_of_agents:int, num_of_items:int,
-    value_noise_ratio:float,
-    beta:float, delta:List[float],
-    algorithm:Callable,
-    random_seed: int):
+        num_of_agents:int, num_of_items:int,
+        value_noise_ratio:float,
+        beta:float, delta:List[float],
+        algorithm:Callable,
+        random_seed: int, check_history: bool = True):
     agent_capacity_bounds =  [6, 6]
     item_capacity_bounds = [40, 40]
     np.random.seed(random_seed)
@@ -104,7 +106,7 @@ def course_allocation_with_random_instance_uniform(
         item_base_value_bounds=[1, max_value],
         item_subjective_ratio_bounds=[1 - value_noise_ratio, 1 + value_noise_ratio]
     )
-    return evaluate_algorithm_on_instance(algorithm, instance, beta, delta)
+    return evaluate_algorithm_on_instance(algorithm, instance, beta, delta, check_history)
 
 def run_beta_delta_experiment():
     # Run on uniformly-random data with beta and delta parameters:
@@ -223,6 +225,50 @@ def run_ariel_experiment():
     }
     experiment.run_with_time_limit(course_allocation_with_random_instance_sample, input_ranges, time_limit=TIME_LIMIT)
 
+def run_check_performance_of_history():
+    num_of_agents_values = [10, 20]
+    beta = 0.5
+    delta = [0.1, 0.2]
+    value_noise_ratio = 0.5
+    num_of_items = 25
+    random_seed = 42
+    algorithm = crs.tabu_search
+
+    times_true = []
+    times_false = []
+    max_agents_within_60s_true = 0
+    max_agents_within_60s_false = 0
+
+    for num_of_agents in num_of_agents_values:
+        start_time = time.time()
+        course_allocation_with_random_instance_uniform(num_of_agents, num_of_items, value_noise_ratio, beta, delta, algorithm, random_seed, check_history=True)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        times_true.append(elapsed_time)
+        if elapsed_time < 60:
+            max_agents_within_60s_true = num_of_agents
+
+        start_time = time.time()
+        course_allocation_with_random_instance_uniform(num_of_agents, num_of_items, value_noise_ratio, beta, delta, algorithm, random_seed, check_history=False)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        times_false.append(elapsed_time)
+        if elapsed_time < 60:
+            max_agents_within_60s_false = num_of_agents
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(num_of_agents_values, times_true, label='check_history=True', marker='o')
+    plt.plot(num_of_agents_values, times_false, label='check_history=False', marker='o')
+    plt.xlabel('Number of Agents')
+    plt.ylabel('Run Time (seconds)')
+    plt.title('Run Time vs Number of Agents for Tabu Search')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig('check_history_performance.png')
+    plt.show()
+
+    return max_agents_within_60s_true, max_agents_within_60s_false
+
 
 ######### MAIN PROGRAM ##########
 
@@ -233,4 +279,7 @@ if __name__ == "__main__":
     # run_uniform_experiment()
     # run_szws_experiment()
     # run_ariel_experiment()
-    run_beta_delta_experiment()
+    # run_beta_delta_experiment()
+    max_agents_true, max_agents_false = run_check_performance_of_history()
+    print(f'Max number of agents handled in 60 seconds with check_history=True: {max_agents_true}')
+    print(f'Max number of agents handled in 60 seconds with check_history=False: {max_agents_false}')
