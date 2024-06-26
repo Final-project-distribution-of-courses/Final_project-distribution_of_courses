@@ -48,6 +48,14 @@ def test_case2():
     for i in range(1, 101):
         assert (f"c{i}" in allocation[f"s{i}"])
 
+def test_mini_case2():
+    utilities = {f"s{i}": {f"c{j}": 1 if j == i else 0 for j in range(1, 20)} for i in range(1, 20)}
+    instance = Instance(valuations=utilities, agent_capacities=1, item_capacities=1)
+    allocation = divide(tabu_search, instance=instance,
+                        initial_budgets=random_initial_budgets(instance.num_of_agents),
+                        beta=random_beta, delta=random_delta, check_history = False)
+    for i in range(1, 20):
+        assert (f"c{i}" in allocation[f"s{i}"])
 
 # Each student i will get course i, because student i have the highest i budget.
 def test_case3():
