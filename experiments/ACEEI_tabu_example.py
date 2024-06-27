@@ -4,7 +4,7 @@ Compare the performance of algorithms for fair course allocation.
 Programmer: Erel Segal-Halevi
 Since: 2023-07
 """
-
+import os
 ######### COMMON VARIABLES AND ROUTINES ##########
 
 import time
@@ -13,6 +13,9 @@ import fairpyx.algorithms as crs
 from typing import *
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import ast
+import seaborn as sns
 
 
 max_value = 1000
@@ -108,21 +111,92 @@ def course_allocation_with_random_instance_uniform(
     )
     return evaluate_algorithm_on_instance(algorithm, instance, beta, delta, check_history)
 
+
+RESULTS_BETA_DELTA_FILE = "results/course_allocation_beta_delta.csv"
 def run_beta_delta_experiment():
+    # Remove existing results file if it exists
+    if os.path.exists(RESULTS_BETA_DELTA_FILE):
+        os.remove(RESULTS_BETA_DELTA_FILE)
+
     # Run on uniformly-random data with beta and delta parameters:
     experiment = experiments_csv.Experiment("results/", "course_allocation_beta_delta.csv",
                                             backup_folder="results/backup/")
+    # input_ranges = {
+    #     "num_of_agents": [10, 20],
+    #     "num_of_items": [4, 6],
+    #     "value_noise_ratio": [0, 0.2, 0.5, 0.8, 1],
+    #     "beta": [0.1, 0.3, 0.5, 5, 10, 15, 23, 40],  # example values for beta
+    #     "delta": [{0.001, 0.9}, {0.123}, {0.4, 0.45}, {0.5}, {0.6, 0.7, 0.8}],
+    #     # example values for delta
+    #     "algorithm": [crs.tabu_search],  # only the tabu_search algorithm
+    #     "random_seed": range(5),
+    # }
+
     input_ranges = {
-        "num_of_agents": [100, 200, 300],
-        "num_of_items": [6],
-        "value_noise_ratio": [0, 0.2, 0.5, 0.8, 1],
-        "beta": [0.1, 0.3, 0.5, 3, 5, 8, 10, 15, 23, 40],  # example values for beta
-        "delta": [[0.01], [0.1, 0.123], [0.2], [0.3], [0.4, 0.45], [0.5], [0.6, 0.7, 0.8], [0.9], [0.99]],
+        "num_of_agents": [5],
+        "num_of_items": [3],
+        "value_noise_ratio": [0.2],
+        "beta": [0.1],  # example values for beta
+        "delta": [{0.5}],
         # example values for delta
         "algorithm": [crs.tabu_search],  # only the tabu_search algorithm
         "random_seed": range(5),
     }
+
     experiment.run_with_time_limit(course_allocation_with_random_instance_uniform, input_ranges, time_limit=TIME_LIMIT)
+
+def analyze_experiment_results():
+    # Load the results from the CSV file
+    df = pd.read_csv(RESULTS_BETA_DELTA_FILE)
+
+    # Define your performance metric (replace 'max_envy' with the actual column name if needed)
+    best_row = df.loc[df['max_envy'].idxmin()]
+
+    # Extract the best beta and delta values
+    best_beta = best_row['beta']
+    best_delta = ast.literal_eval(best_row['delta'])  # Convert string back to set
+
+    print(f"Best beta: {best_beta}")
+    print(f"Best delta: {best_delta}")
+
+    return df
+
+
+def plot_speed_vs_beta(df):
+    plt.figure(figsize=(10, 6))
+    sns.lineplot(data=df, x='beta', y='runtime', marker='o', err_style=None)
+    plt.title('Algorithm Speed vs. Beta')
+    plt.xlabel('Beta')
+    plt.ylabel('Runtime (seconds)')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_speed_vs_delta(df):
+    plt.figure(figsize=(10, 6))
+    sns.lineplot(data=df, x='delta', y='runtime', marker='o', err_style=None)
+    plt.title('Algorithm Speed vs. Delta')
+    plt.xlabel('Delta')
+    plt.ylabel('Runtime (seconds)')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+# def plot_performance(df):
+#     # Prepare the data for plotting
+#     df['delta'] = df['delta'].apply(ast.literal_eval)  # Convert string back to set
+#     df['delta'] = df['delta'].apply(lambda x: next(iter(x)))  # Take the first element in the set for simplicity
+#
+#     # Create the plot
+#     plt.figure(figsize=(12, 8))
+#     sns.scatterplot(data=df, x='beta', y='delta', size='max_envy', hue='max_envy', palette='viridis', sizes=(20, 200))
+#     plt.title('Performance Comparison of Algorithm by Beta and Delta')
+#     plt.xlabel('Beta')
+#     plt.ylabel('Delta')
+#     plt.legend(title='Max Envy', bbox_to_anchor=(1.05, 1), loc='upper left')
+#     plt.tight_layout()
+#     plt.show()
 
 
 def run_uniform_experiment():
@@ -280,6 +354,10 @@ if __name__ == "__main__":
     # run_szws_experiment()
     # run_ariel_experiment()
     # run_beta_delta_experiment()
-    max_agents_true, max_agents_false = run_check_performance_of_history()
-    print(f'Max number of agents handled in 60 seconds with check_history=True: {max_agents_true}')
-    print(f'Max number of agents handled in 60 seconds with check_history=False: {max_agents_false}')
+    # max_agents_true, max_agents_false = run_check_performance_of_history()
+    # print(f'Max number of agents handled in 60 seconds with check_history=True: {max_agents_true}')
+    # print(f'Max number of agents handled in 60 seconds with check_history=False: {max_agents_false}')
+    run_beta_delta_experiment()
+    df = analyze_experiment_results()
+    plot_speed_vs_delta(df)
+    plot_speed_vs_beta(df)
