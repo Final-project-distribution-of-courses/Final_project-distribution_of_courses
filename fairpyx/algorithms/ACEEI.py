@@ -15,6 +15,7 @@ import numpy as np
 from fairpyx import Instance, AllocationBuilder
 from itertools import combinations
 from fairpyx.algorithms import linear_program as lp
+import concurrent.futures
 
 
 class EFTBStatus(Enum):
