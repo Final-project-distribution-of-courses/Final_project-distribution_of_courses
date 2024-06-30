@@ -164,6 +164,51 @@ def find_ACEEI_with_EFTB(alloc: AllocationBuilder, **kwargs):
     logger.info(f"\nfinal prices p* = {prices}")
 
 # ---------------------helper functions:---------------------
+
+def process_student(instance, student, initial_budgets, epsilon, prices):
+    best_bundle_per_budget = {}
+    # Creating a list of combinations of courses up to the size of the student's capacity
+    combinations_courses_list = []
+    capacity = instance.agent_capacity(student)
+    for r in range(1, capacity + 1):
+        combinations_courses_list.extend(combinations(instance.items, r))
+    # logger.info(f"FINISH combinations for {student}")
+
+    #  We would like to meet the requirement of the number of courses a student needs, therefore if
+    #  the current combination meets the requirement we will give it more weight
+    large_num = instance.agent_maximum_value(student)
+
+    # Define a lambda function that calculates the valuation of a combination
+    valuation_function = lambda combination: instance.agent_bundle_value(student, combination) + (
+        large_num if len(combination) == instance.agent_capacity(student) else 0)
+
+    # Sort the combinations_set based on their valuations in descending order
+    combinations_courses_sorted = sorted(combinations_courses_list, key=valuation_function, reverse=True)
+
+    # Setting the min and max budget according to the definition
+    min_budget = initial_budgets[student] - epsilon
+    max_budget = initial_budgets[student] + epsilon
+
+    # Sort the combinations of the courses in descending order according to utility. We went through the
+    # budgets in descending order, for each budget we looked for the combination with the maximum value that
+    # could be taken in that budget.
+    min_price = float('inf')
+
+    for combination in combinations_courses_sorted:
+        price_combination = sum(prices[course] for course in combination)
+
+        if price_combination <= max_budget:
+            if price_combination <= min_budget:
+                best_bundle_per_budget.setdefault(student, {})[min_budget] = combination
+                break
+
+            if price_combination < min_price:
+                min_price = price_combination
+                best_bundle_per_budget.setdefault(student, {})[price_combination] = combination
+
+    return best_bundle_per_budget
+
+
 def student_best_bundle_per_budget(prices: dict, instance: Instance, epsilon: any, initial_budgets: dict):
     """
     Return a dict that says for each budget what is the bundle with the maximum utility that a student can take
@@ -216,48 +261,18 @@ def student_best_bundle_per_budget(prices: dict, instance: Instance, epsilon: an
     """
 
     logger.info("START student_best_bundle_per_budget")
-    best_bundle_per_budget = {student: {} for student in instance.agents}
-    # logger.info("START combinations")
-    for student in instance.agents:
+    best_bundle_per_budget = {}
 
-        # Creating a list of combinations of courses up to the size of the student's capacity
-        combinations_courses_list = []
-        capacity = instance.agent_capacity(student)
-        for r in range(1, capacity + 1):
-            combinations_courses_list.extend(combinations(instance.items, r))
-        # logger.info(f"FINISH combinations for {student}")
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [
+            executor.submit(
+                process_student, instance, student, initial_budgets, epsilon, prices
+            )
+            for student in instance.agents
+        ]
 
-        #  We would like to meet the requirement of the number of courses a student needs, therefore if
-        #  the current combination meets the requirement we will give it more weight
-        large_num = instance.agent_maximum_value(student)
-
-        # Define a lambda function that calculates the valuation of a combination
-        valuation_function = lambda combination: instance.agent_bundle_value(student, combination) + (
-            large_num if len(combination) == instance.agent_capacity(student) else 0)
-
-        # Sort the combinations_set based on their valuations in descending order
-        combinations_courses_sorted = sorted(combinations_courses_list, key=valuation_function, reverse=True)
-
-        # Setting the min and max budget according to the definition
-        min_budget = initial_budgets[student] - epsilon
-        max_budget = initial_budgets[student] + epsilon
-
-        # Sort the combinations of the courses in descending order according to utility. We went through the
-        # budgets in descending order, for each budget we looked for the combination with the maximum value that
-        # could be taken in that budget.
-        min_price = float('inf')
-
-        for combination in combinations_courses_sorted:
-            price_combination = sum(prices[course] for course in combination)
-
-            if price_combination <= max_budget:
-                if price_combination <= min_budget:
-                    best_bundle_per_budget.setdefault(student, {})[min_budget] = combination
-                    break
-
-                if price_combination < min_price:
-                    min_price = price_combination
-                    best_bundle_per_budget.setdefault(student, {})[price_combination] = combination
+        for student, future in zip(instance.agents, concurrent.futures.as_completed(futures)):
+            best_bundle_per_budget.update(future.result())
 
     return best_bundle_per_budget
 
