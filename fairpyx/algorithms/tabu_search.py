@@ -14,13 +14,12 @@ from itertools import combinations, product
 import numpy as np
 
 from fairpyx import Instance, AllocationBuilder
+import improve_student_best_bundles
 
 # Setup logger and colored logs
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
-
-
 
 
 # ---------------------The main function---------------------
@@ -37,6 +36,7 @@ def tabu_search(alloc: AllocationBuilder, **kwargs):
     >>> from fairpyx.adaptors import divide
     >>> from fairpyx.utils.test_utils import stringify
     >>> from fairpyx import Instance
+    >>> from improve_student_best_bundles import student_best_bundles
 
     >>> random.seed(9865)
     >>> instance = Instance(
@@ -253,86 +253,86 @@ def clipped_excess_demand(instance: Instance, prices: dict, allocation: dict):
     return clipped_z
 
 
-def student_best_bundles(prices: dict, instance: Instance, initial_budgets: dict):
-    """
-    Return a list of dictionaries that tells for each student all the bundle options he can take with the maximum benefit
-
-    :param prices: dictionary with courses prices
-    :param instance: fair-course-allocation instance
-    :param initial_budgets: students' initial budgets
-
-    :return: a list of dictionaries that maps each student to its best bundle.
-
-     Example run 1 iteration 1
-    >>> instance = Instance(
-    ...     valuations={"Alice":{"x":3, "y":4, "z":2}, "Bob":{"x":4, "y":3, "z":2}, "Eve":{"x":2, "y":4, "z":3}},
-    ...     agent_capacities=2,
-    ...     item_capacities={"x":2, "y":1, "z":3})
-    >>> initial_budgets = {"Alice": 5, "Bob": 4, "Eve": 3}
-    >>> prices = {"x": 1, "y": 2, "z": 1}
-    >>> student_best_bundles(prices, instance, initial_budgets)
-    [{'Alice': ('x', 'y'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}]
-
-     Example run 2 iteration 1
-    >>> instance = Instance(
-    ...     valuations={"Alice":{"x":5, "y":4, "z":3, "w":2}, "Bob":{"x":5, "y":2, "z":4, "w":3}},
-    ...     agent_capacities=3,
-    ...     item_capacities={"x":1, "y":2, "z":1, "w":2})
-    >>> initial_budgets = {"Alice": 8, "Bob": 6}
-    >>> prices = {"x": 1, "y": 2, "z": 3, "w":4}
-    >>> student_best_bundles(prices, instance, initial_budgets)
-    [{'Alice': ('x', 'y', 'z'), 'Bob': ('x', 'y', 'z')}]
-
-
-    Example run 3 iteration 1
-    >>> instance = Instance(
-    ...     valuations={"Alice":{"x":3, "y":3, "z":3, "w":3}, "Bob":{"x":3, "y":3, "z":3, "w":3}, "Eve":{"x":4, "y":4, "z":4, "w":4}},
-    ...     agent_capacities=2,
-    ...     item_capacities={"x":1, "y":2, "z":2, "w":1})
-    >>> initial_budgets = {"Alice": 4, "Bob": 5, "Eve": 2}
-    >>> prices = {'x': 2.6124658024539347, 'y': 0, 'z': 1.1604071365185367, 'w': 5.930224022321449}
-    >>> student_best_bundles(prices, instance, initial_budgets)
-    [{'Alice': ('x', 'y'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'y'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'y'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}]
-
-
-    """
-    all_combinations = {student: [] for student in instance.agents}
-
-    for student in instance.agents:
-        combinations_courses_list = []
-        capacity = instance.agent_capacity(student)
-        for r in range(1, capacity + 1):
-            combinations_courses_list.extend(combinations(instance.items, r))
-
-        valuation_function = lambda combination: instance.agent_bundle_value(student, combination)
-        combinations_courses_sorted = sorted(combinations_courses_list, key=valuation_function, reverse=True)
-
-        max_valuation = -1
-        for combination in combinations_courses_sorted:
-            price_combination = sum(prices[course] for course in combination)
-            if price_combination <= initial_budgets[student]:
-                current_valuation = valuation_function(combination)
-                if current_valuation >= max_valuation:
-                    if current_valuation > max_valuation:
-                        all_combinations[student] = []
-                    max_valuation = current_valuation
-                    all_combinations[student].append(combination)
-
-        if not all_combinations[student]:
-            all_combinations[student].append(())
-
-    all_combinations_list = list(product(*all_combinations.values()))
-
-    valid_allocations = []
-    for allocation in all_combinations_list:
-        valid_allocation = {}
-        for student, bundle in zip(instance.agents, allocation):
-            if sum(prices[item] for item in bundle) <= initial_budgets[student]:
-                valid_allocation[student] = bundle
-        if len(valid_allocation) == len(instance.agents):
-            valid_allocations.append(valid_allocation)
-
-    return valid_allocations
+# def student_best_bundles(prices: dict, instance: Instance, initial_budgets: dict):
+#     """
+#     Return a list of dictionaries that tells for each student all the bundle options he can take with the maximum benefit
+#
+#     :param prices: dictionary with courses prices
+#     :param instance: fair-course-allocation instance
+#     :param initial_budgets: students' initial budgets
+#
+#     :return: a list of dictionaries that maps each student to its best bundle.
+#
+#      Example run 1 iteration 1
+#     >>> instance = Instance(
+#     ...     valuations={"Alice":{"x":3, "y":4, "z":2}, "Bob":{"x":4, "y":3, "z":2}, "Eve":{"x":2, "y":4, "z":3}},
+#     ...     agent_capacities=2,
+#     ...     item_capacities={"x":2, "y":1, "z":3})
+#     >>> initial_budgets = {"Alice": 5, "Bob": 4, "Eve": 3}
+#     >>> prices = {"x": 1, "y": 2, "z": 1}
+#     >>> student_best_bundles(prices, instance, initial_budgets)
+#     [{'Alice': ('x', 'y'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}]
+#
+#      Example run 2 iteration 1
+#     >>> instance = Instance(
+#     ...     valuations={"Alice":{"x":5, "y":4, "z":3, "w":2}, "Bob":{"x":5, "y":2, "z":4, "w":3}},
+#     ...     agent_capacities=3,
+#     ...     item_capacities={"x":1, "y":2, "z":1, "w":2})
+#     >>> initial_budgets = {"Alice": 8, "Bob": 6}
+#     >>> prices = {"x": 1, "y": 2, "z": 3, "w":4}
+#     >>> student_best_bundles(prices, instance, initial_budgets)
+#     [{'Alice': ('x', 'y', 'z'), 'Bob': ('x', 'y', 'z')}]
+#
+#
+#     Example run 3 iteration 1
+#     >>> instance = Instance(
+#     ...     valuations={"Alice":{"x":3, "y":3, "z":3, "w":3}, "Bob":{"x":3, "y":3, "z":3, "w":3}, "Eve":{"x":4, "y":4, "z":4, "w":4}},
+#     ...     agent_capacities=2,
+#     ...     item_capacities={"x":1, "y":2, "z":2, "w":1})
+#     >>> initial_budgets = {"Alice": 4, "Bob": 5, "Eve": 2}
+#     >>> prices = {'x': 2.6124658024539347, 'y': 0, 'z': 1.1604071365185367, 'w': 5.930224022321449}
+#     >>> student_best_bundles(prices, instance, initial_budgets)
+#     [{'Alice': ('x', 'y'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'y'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'y'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}]
+#
+#
+#     """
+#     all_combinations = {student: [] for student in instance.agents}
+#
+#     for student in instance.agents:
+#         combinations_courses_list = []
+#         capacity = instance.agent_capacity(student)
+#         for r in range(1, capacity + 1):
+#             combinations_courses_list.extend(combinations(instance.items, r))
+#
+#         valuation_function = lambda combination: instance.agent_bundle_value(student, combination)
+#         combinations_courses_sorted = sorted(combinations_courses_list, key=valuation_function, reverse=True)
+#
+#         max_valuation = -1
+#         for combination in combinations_courses_sorted:
+#             price_combination = sum(prices[course] for course in combination)
+#             if price_combination <= initial_budgets[student]:
+#                 current_valuation = valuation_function(combination)
+#                 if current_valuation >= max_valuation:
+#                     if current_valuation > max_valuation:
+#                         all_combinations[student] = []
+#                     max_valuation = current_valuation
+#                     all_combinations[student].append(combination)
+#
+#         if not all_combinations[student]:
+#             all_combinations[student].append(())
+#
+#     all_combinations_list = list(product(*all_combinations.values()))
+#
+#     valid_allocations = []
+#     for allocation in all_combinations_list:
+#         valid_allocation = {}
+#         for student, bundle in zip(instance.agents, allocation):
+#             if sum(prices[item] for item in bundle) <= initial_budgets[student]:
+#                 valid_allocation[student] = bundle
+#         if len(valid_allocation) == len(instance.agents):
+#             valid_allocations.append(valid_allocation)
+#
+#     return valid_allocations
 
 
 def find_all_equivalent_prices(instance: Instance, initial_budgets: dict, allocation: dict):
@@ -736,26 +736,26 @@ if __name__ == "__main__":
 
     # doctest.testmod()
 
-    random_delta = {random.uniform(0.1, 1)}
-    random_beta = random.uniform(1, 100)
-
-
-    def random_initial_budgets(num):
-        return {f"s{key}": random.uniform(1, 1 + random_beta) for key in range(1, num + 1)}
-
-    num_of_agents = 100
-    utilities = {f"s{i}": {f"c{num_of_agents + 1 - j}": j for j in range(num_of_agents, 0, -1)} for i in
-                 range(1, num_of_agents + 1)}
-    instance = Instance(valuations=utilities, agent_capacities=1, item_capacities=1)
-    initial_budgets = {f"s{key}": (num_of_agents + 1 - key) for key in range(1, num_of_agents+1)}
-    logger.error(f"initial_budgets = {initial_budgets}")
-    logger.error(f"random_beta = {random_beta}")
-    # initial_budgets = {f"s{key}": (random_beta + key) for key in range(1, num_of_agents + 1)}
-    allocation = divide(tabu_search, instance=instance,
-                        initial_budgets=initial_budgets,
-                        beta=random_beta, delta=random_delta)
-    for i in range(1, num_of_agents + 1):
-        assert (f"c{i}" in allocation[f"s{i}"])
+    # random_delta = {random.uniform(0.1, 1)}
+    # random_beta = random.uniform(1, 100)
+    #
+    #
+    # def random_initial_budgets(num):
+    #     return {f"s{key}": random.uniform(1, 1 + random_beta) for key in range(1, num + 1)}
+    #
+    # num_of_agents = 100
+    # utilities = {f"s{i}": {f"c{num_of_agents + 1 - j}": j for j in range(num_of_agents, 0, -1)} for i in
+    #              range(1, num_of_agents + 1)}
+    # instance = Instance(valuations=utilities, agent_capacities=1, item_capacities=1)
+    # initial_budgets = {f"s{key}": (num_of_agents + 1 - key) for key in range(1, num_of_agents+1)}
+    # logger.error(f"initial_budgets = {initial_budgets}")
+    # logger.error(f"random_beta = {random_beta}")
+    # # initial_budgets = {f"s{key}": (random_beta + key) for key in range(1, num_of_agents + 1)}
+    # allocation = divide(tabu_search, instance=instance,
+    #                     initial_budgets=initial_budgets,
+    #                     beta=random_beta, delta=random_delta)
+    # for i in range(1, num_of_agents + 1):
+    #     assert (f"c{i}" in allocation[f"s{i}"])
 
 
     # seed = random.randint(1, 10000)
@@ -767,12 +767,12 @@ if __name__ == "__main__":
     # with open('seed.txt', 'a') as file:
     #     file.write(f"seed is {seed}\n")
     #
-    # # instance = Instance(valuations = {"ami": {"x": 4, "y": 3, "z": 2}, "tami": {"x": 5, "y": 1, "z": 2}}, agent_capacities = 2,
-    # #     item_capacities = {"x": 1, "y": 2, "z": 3})
-    # # initial_budgets = {"ami": 6, "tami": 4}
-    # # beta = 6
-    # # divide(tabu_search, instance=instance, initial_budgets=initial_budgets, beta=beta, delta={0.72})
-    # # # "{ami:['x', 'y'], tami:['y', 'z']}"
+    instance = Instance(valuations = {"ami": {"x": 4, "y": 3, "z": 2}, "tami": {"x": 5, "y": 1, "z": 2}}, agent_capacities = 2,
+        item_capacities = {"x": 1, "y": 2, "z": 3})
+    initial_budgets = {"ami": 6, "tami": 4}
+    beta = 6
+    divide(tabu_search, instance=instance, initial_budgets=initial_budgets, beta=beta, delta={0.72})
+    # # "{ami:['x', 'y'], tami:['y', 'z']}"
     #
     # # instance = Instance(valuations = {"ami": {"x": 4, "y": 3, "z": 2}, "tami": {"x": 5, "y": 1, "z": 2}},
     # #     agent_capacities = 2, item_capacities = {"x": 1, "y": 1, "z": 1})
