@@ -10,6 +10,7 @@ Since: 2024-01
 import logging
 import random
 from itertools import combinations, product
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -320,6 +321,97 @@ def student_best_bundles(prices: dict, instance: Instance, initial_budgets: dict
 
         if not all_combinations[student]:
             all_combinations[student].append(())
+
+    all_combinations_list = list(product(*all_combinations.values()))
+
+    valid_allocations = []
+    for allocation in all_combinations_list:
+        valid_allocation = {}
+        for student, bundle in zip(instance.agents, allocation):
+            if sum(prices[item] for item in bundle) <= initial_budgets[student]:
+                valid_allocation[student] = bundle
+        if len(valid_allocation) == len(instance.agents):
+            valid_allocations.append(valid_allocation)
+
+    return valid_allocations
+
+def compute_best_bundles_for_student(student, instance, prices, initial_budgets):
+    combinations_courses_list = []
+    capacity = instance.agent_capacity(student)
+    for r in range(1, capacity + 1):
+        combinations_courses_list.extend(combinations(instance.items, r))
+
+    valuation_function = lambda combination: instance.agent_bundle_value(student, combination)
+    combinations_courses_sorted = sorted(combinations_courses_list, key=valuation_function, reverse=True)
+
+    max_valuation = -1
+    best_combinations = []
+    for combination in combinations_courses_sorted:
+        price_combination = sum(prices[course] for course in combination)
+        if price_combination <= initial_budgets[student]:
+            current_valuation = valuation_function(combination)
+            if current_valuation >= max_valuation:
+                if current_valuation > max_valuation:
+                    best_combinations = []
+                max_valuation = current_valuation
+                best_combinations.append(combination)
+
+    if not best_combinations:
+        best_combinations.append(())
+
+    return student, best_combinations
+
+def student_best_bundles_with_threads(prices: dict, instance: Instance, initial_budgets: dict):
+    """
+    Return a list of dictionaries that tells for each student all the bundle options he can take with the maximum benefit
+
+    :param prices: dictionary with courses prices
+    :param instance: fair-course-allocation instance
+    :param initial_budgets: students' initial budgets
+
+    :return: a list of dictionaries that maps each student to its best bundle.
+
+     Example run 1 iteration 1
+    >>> instance = Instance(
+    ...     valuations={"Alice":{"x":3, "y":4, "z":2}, "Bob":{"x":4, "y":3, "z":2}, "Eve":{"x":2, "y":4, "z":3}},
+    ...     agent_capacities=2,
+    ...     item_capacities={"x":2, "y":1, "z":3})
+    >>> initial_budgets = {"Alice": 5, "Bob": 4, "Eve": 3}
+    >>> prices = {"x": 1, "y": 2, "z": 1}
+    >>> student_best_bundles_with_threads(prices, instance, initial_budgets)
+    [{'Alice': ('x', 'y'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}]
+
+     Example run 2 iteration 1
+    >>> instance = Instance(
+    ...     valuations={"Alice":{"x":5, "y":4, "z":3, "w":2}, "Bob":{"x":5, "y":2, "z":4, "w":3}},
+    ...     agent_capacities=3,
+    ...     item_capacities={"x":1, "y":2, "z":1, "w":2})
+    >>> initial_budgets = {"Alice": 8, "Bob": 6}
+    >>> prices = {"x": 1, "y": 2, "z": 3, "w":4}
+    >>> student_best_bundles_with_threads(prices, instance, initial_budgets)
+    [{'Alice': ('x', 'y', 'z'), 'Bob': ('x', 'y', 'z')}]
+
+
+    Example run 3 iteration 1
+    >>> instance = Instance(
+    ...     valuations={"Alice":{"x":3, "y":3, "z":3, "w":3}, "Bob":{"x":3, "y":3, "z":3, "w":3}, "Eve":{"x":4, "y":4, "z":4, "w":4}},
+    ...     agent_capacities=2,
+    ...     item_capacities={"x":1, "y":2, "z":2, "w":1})
+    >>> initial_budgets = {"Alice": 4, "Bob": 5, "Eve": 2}
+    >>> prices = {'x': 2.6124658024539347, 'y': 0, 'z': 1.1604071365185367, 'w': 5.930224022321449}
+    >>> student_best_bundles_with_threads(prices, instance, initial_budgets)
+    [{'Alice': ('x', 'y'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'y'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'y'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}]
+
+
+    """
+
+    all_combinations = {}
+
+    with ThreadPoolExecutor() as executor:
+        futures = [executor.submit(compute_best_bundles_for_student, student, instance, prices, initial_budgets) for student in instance.agents]
+        for future in futures:
+            student, best_combinations = future.result()
+            all_combinations[student] = best_combinations
 
     all_combinations_list = list(product(*all_combinations.values()))
 
