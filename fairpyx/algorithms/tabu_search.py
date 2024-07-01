@@ -97,12 +97,16 @@ def tabu_search(alloc: AllocationBuilder, **kwargs):
     initial_budgets = kwargs.get('initial_budgets')
     beta = kwargs.get('beta')
     delta = kwargs.get('delta')
+    use_threads = kwargs.get('use_threads', True)
 
     prices = {course: random.uniform(1, 1 + beta) for course in alloc.instance.items}
     history = []
 
     logger.info("2) If ∥𝒛(𝒖,𝒄, 𝒑, 𝒃0)∥2 = 0, terminate with 𝒑∗ = 𝒑.")
-    max_utilities_allocations = student_best_bundles(prices.copy(), alloc.instance, initial_budgets)
+    if use_threads:
+        max_utilities_allocations = student_best_bundles_with_threads(prices.copy(), alloc.instance, initial_budgets)
+    else:
+        max_utilities_allocations = student_best_bundles(prices.copy(), alloc.instance, initial_budgets)
     allocation, excess_demand_vector, norma = min_excess_demand_for_allocation(alloc.instance, prices,
                                                                                max_utilities_allocations)
     best_allocation = allocation
@@ -124,14 +128,14 @@ def tabu_search(alloc: AllocationBuilder, **kwargs):
         history.append(equivalent_prices)
         neighbors = find_all_neighbors(alloc.instance, history, prices, delta, excess_demand_vector,
                                        initial_budgets,
-                                       allocation)
+                                       allocation, use_threads)
         if len(neighbors) == 0:
             logger.info("\n-- NO OPTIMAL SOLUTION --")
             break
 
         logger.info("   update 𝒑 ← arg min𝒑′∈N (𝒑)−H ∥𝒛(𝒖,𝒄, 𝒑', 𝒃0)∥2")
         allocation, excess_demand_vector, norma, prices = find_min_error_prices(alloc.instance, neighbors,
-                                                                                initial_budgets)
+                                                                                initial_budgets, use_threads)
 
         if norma < best_norma:
             best_allocation = allocation
@@ -652,7 +656,7 @@ def differ_in_one_value(original_allocation: dict, new_allocation: dict, course:
 
 
 def find_individual_price_adjustment_neighbors(instance: Instance, history: list[list], prices: dict,
-                                               excess_demand_vector: dict, initial_budgets: dict, allocation: dict):
+                                               excess_demand_vector: dict, initial_budgets: dict, allocation: dict, use_threads: bool):
     """
     Add the individual price adjustment neighbors N(p) to the neighbors list
 
@@ -724,7 +728,11 @@ def find_individual_price_adjustment_neighbors(instance: Instance, history: list
                 if any(all(f(updated_prices) for f in sublist) for sublist in history):
                     continue
                 # get the new demand of the course
-                new_allocations = student_best_bundles(updated_prices.copy(), instance, initial_budgets)
+                if use_threads:
+                    new_allocations = student_best_bundles_with_threads(updated_prices.copy(), instance, initial_budgets)
+                else:
+                    new_allocations = student_best_bundles(updated_prices.copy(), instance, initial_budgets)
+
                 for new_allocation in new_allocations:
                     if differ_in_one_value(allocation, new_allocation, course):
                         new_neighbors.append(updated_prices.copy())
@@ -738,7 +746,7 @@ def find_individual_price_adjustment_neighbors(instance: Instance, history: list
 
 
 def find_all_neighbors(instance: Instance, history: list, prices: dict, delta: set,
-                       excess_demand_vector: dict, initial_budgets: dict, allocation: dict):
+                       excess_demand_vector: dict, initial_budgets: dict, allocation: dict, use_threads:bool):
     """
     Update neighbors N (𝒑) - list of Gradient neighbors and Individual price adjustment neighbors.
 
@@ -752,14 +760,14 @@ def find_all_neighbors(instance: Instance, history: list, prices: dict, delta: s
     individual_price_adjustment_neighbors = find_individual_price_adjustment_neighbors(instance, history,
                                                                                        prices,
                                                                                        excess_demand_vector,
-                                                                                       initial_budgets, allocation)
+                                                                                       initial_budgets, allocation, use_threads)
     logger.debug(f"neighbors: \ngradient_neighbors = {gradient_neighbors}")
     logger.debug(f"individual_price = {individual_price_adjustment_neighbors}")
 
     return gradient_neighbors + individual_price_adjustment_neighbors
 
 
-def find_min_error_prices(instance: Instance, neighbors: list, initial_budgets: dict):
+def find_min_error_prices(instance: Instance, neighbors: list, initial_budgets: dict, use_threads: bool):
     """
     Return the update prices that minimize the market clearing error.
 
@@ -795,7 +803,10 @@ def find_min_error_prices(instance: Instance, neighbors: list, initial_budgets: 
     logger.debug("\nChecking the neighbors:")
     for neighbor in neighbors:
         logger.debug(f"neighbor: {neighbor}")
-        allocations = student_best_bundles(neighbor.copy(), instance, initial_budgets)
+        if use_threads:
+            allocations = student_best_bundles_with_threads(neighbor.copy(), instance, initial_budgets)
+        else:
+            allocations = student_best_bundles(neighbor.copy(), instance, initial_budgets)
         allocation, excess_demand_vector, norma = min_excess_demand_for_allocation(instance, neighbor, allocations)
         logger.debug(f"excess demand: {excess_demand_vector}")
         logger.debug(f"norma = {norma}")
