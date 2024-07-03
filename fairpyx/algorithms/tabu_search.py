@@ -14,7 +14,8 @@ from itertools import combinations, product
 import numpy as np
 
 from fairpyx import Instance, AllocationBuilder
-import improve_student_best_bundles
+from fairpyx.algorithms.improve_student_best_bundles import student_best_bundles
+
 
 # Setup logger and colored logs
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ def tabu_search(alloc: AllocationBuilder, **kwargs):
     >>> from fairpyx.adaptors import divide
     >>> from fairpyx.utils.test_utils import stringify
     >>> from fairpyx import Instance
-    >>> from improve_student_best_bundles import student_best_bundles
+    >>> from fairpyx.algorithms.improve_student_best_bundles import student_best_bundles
 
     >>> random.seed(9865)
     >>> instance = Instance(
@@ -720,19 +721,19 @@ if __name__ == "__main__":
     import doctest
 
 
-    import coloredlogs
-
-    # Customizing the colors and format
-    level_styles = {
-        'debug': {'color': 'green'},
-        'info': {'color': 'cyan'},
-        'warning': {'color': 'yellow'},
-        'error': {'color': 'red', 'bold': True},
-        'critical': {'color': 'red', 'bold': True, 'background': 'white'}
-    }
-
-    # Setup colored logs with custom format
-    coloredlogs.install(level='DEBUG', logger=logger, fmt='%(message)s', level_styles=level_styles)
+    # import coloredlogs
+    #
+    # # Customizing the colors and format
+    # level_styles = {
+    #     'debug': {'color': 'green'},
+    #     'info': {'color': 'cyan'},
+    #     'warning': {'color': 'yellow'},
+    #     'error': {'color': 'red', 'bold': True},
+    #     'critical': {'color': 'red', 'bold': True, 'background': 'white'}
+    # }
+    #
+    # # Setup colored logs with custom format
+    # coloredlogs.install(level='DEBUG', logger=logger, fmt='%(message)s', level_styles=level_styles)
 
     # doctest.testmod()
 
