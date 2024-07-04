@@ -184,8 +184,8 @@ RESULTS_BETA_DELTA_FILE_TABU_SEARCH = "results/compering_beta_delta_tabu_search.
 
 def run_beta_delta_experiment_tabu_search():
     # Remove existing results file if it exists
-    if os.path.exists(RESULTS_BETA_DELTA_FILE_TABU_SEARCH):
-        os.remove(RESULTS_BETA_DELTA_FILE_TABU_SEARCH)
+    # if os.path.exists(RESULTS_BETA_DELTA_FILE_TABU_SEARCH):
+    #     os.remove(RESULTS_BETA_DELTA_FILE_TABU_SEARCH)
 
     # Run on uniformly-random data with beta and delta parameters:
     experiment = experiments_csv.Experiment("results/", "compering_beta_delta_tabu_search.csv",
