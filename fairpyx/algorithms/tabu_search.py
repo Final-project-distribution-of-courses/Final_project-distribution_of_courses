@@ -104,9 +104,9 @@ def tabu_search(alloc: AllocationBuilder, **kwargs):
 
     logger.info("2) If ∥𝒛(𝒖,𝒄, 𝒑, 𝒃0)∥2 = 0, terminate with 𝒑∗ = 𝒑.")
     if use_threads:
-        max_utilities_allocations = student_best_bundles_with_threads(prices.copy(), alloc.instance, initial_budgets)
+        max_utilities_allocations = compute_best_bundles_for_all_students_with_threads(prices.copy(), alloc.instance, initial_budgets)
     else:
-        max_utilities_allocations = student_best_bundles(prices.copy(), alloc.instance, initial_budgets)
+        max_utilities_allocations = compute_best_bundles_for_all_students(prices.copy(), alloc.instance, initial_budgets)
     allocation, excess_demand_vector, norma = min_excess_demand_for_allocation(alloc.instance, prices,
                                                                                max_utilities_allocations)
     best_allocation = allocation
@@ -258,7 +258,7 @@ def clipped_excess_demand(instance: Instance, prices: dict, allocation: dict):
     return clipped_z
 
 
-def student_best_bundles(prices: dict, instance: Instance, initial_budgets: dict):
+def compute_best_bundles_for_all_students(prices: dict, instance: Instance, initial_budgets: dict):
     """
     Return a list of dictionaries that tells for each student all the bundle options he can take with the maximum benefit
 
@@ -275,7 +275,7 @@ def student_best_bundles(prices: dict, instance: Instance, initial_budgets: dict
     ...     item_capacities={"x":2, "y":1, "z":3})
     >>> initial_budgets = {"Alice": 5, "Bob": 4, "Eve": 3}
     >>> prices = {"x": 1, "y": 2, "z": 1}
-    >>> student_best_bundles(prices, instance, initial_budgets)
+    >>> compute_best_bundles_for_all_students(prices, instance, initial_budgets)
     [{'Alice': ('x', 'y'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}]
 
      Example run 2 iteration 1
@@ -285,7 +285,7 @@ def student_best_bundles(prices: dict, instance: Instance, initial_budgets: dict
     ...     item_capacities={"x":1, "y":2, "z":1, "w":2})
     >>> initial_budgets = {"Alice": 8, "Bob": 6}
     >>> prices = {"x": 1, "y": 2, "z": 3, "w":4}
-    >>> student_best_bundles(prices, instance, initial_budgets)
+    >>> compute_best_bundles_for_all_students(prices, instance, initial_budgets)
     [{'Alice': ('x', 'y', 'z'), 'Bob': ('x', 'y', 'z')}]
 
 
@@ -296,10 +296,8 @@ def student_best_bundles(prices: dict, instance: Instance, initial_budgets: dict
     ...     item_capacities={"x":1, "y":2, "z":2, "w":1})
     >>> initial_budgets = {"Alice": 4, "Bob": 5, "Eve": 2}
     >>> prices = {'x': 2.6124658024539347, 'y': 0, 'z': 1.1604071365185367, 'w': 5.930224022321449}
-    >>> student_best_bundles(prices, instance, initial_budgets)
+    >>> compute_best_bundles_for_all_students(prices, instance, initial_budgets)
     [{'Alice': ('x', 'y'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'y'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'y'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('x', 'z'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('x', 'y'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('x', 'z'), 'Eve': ('y', 'z')}, {'Alice': ('y', 'z'), 'Bob': ('y', 'z'), 'Eve': ('y', 'z')}]
-
-
     """
     all_combinations = {student: [] for student in instance.agents}
 
@@ -339,7 +337,7 @@ def student_best_bundles(prices: dict, instance: Instance, initial_budgets: dict
 
     return valid_allocations
 
-def compute_best_bundles_for_student(student, instance, prices, initial_budgets):
+def compute_best_bundles_for_one_student(student, instance, prices, initial_budgets):
     combinations_courses_list = []
     capacity = instance.agent_capacity(student)
     for r in range(1, capacity + 1):
@@ -365,7 +363,7 @@ def compute_best_bundles_for_student(student, instance, prices, initial_budgets)
 
     return student, best_combinations
 
-def student_best_bundles_with_threads(prices: dict, instance: Instance, initial_budgets: dict):
+def compute_best_bundles_for_all_students_with_threads(prices: dict, instance: Instance, initial_budgets: dict):
     """
     Return a list of dictionaries that tells for each student all the bundle options he can take with the maximum benefit
 
@@ -412,7 +410,7 @@ def student_best_bundles_with_threads(prices: dict, instance: Instance, initial_
     all_combinations = {}
 
     with ThreadPoolExecutor() as executor:
-        futures = [executor.submit(compute_best_bundles_for_student, student, instance, prices, initial_budgets) for student in instance.agents]
+        futures = [executor.submit(compute_best_bundles_for_one_student, student, instance, prices, initial_budgets) for student in instance.agents]
         for future in futures:
             student, best_combinations = future.result()
             all_combinations[student] = best_combinations
@@ -729,9 +727,9 @@ def find_individual_price_adjustment_neighbors(instance: Instance, history: list
                     continue
                 # get the new demand of the course
                 if use_threads:
-                    new_allocations = student_best_bundles_with_threads(updated_prices.copy(), instance, initial_budgets)
+                    new_allocations = compute_best_bundles_for_all_students_with_threads(updated_prices.copy(), instance, initial_budgets)
                 else:
-                    new_allocations = student_best_bundles(updated_prices.copy(), instance, initial_budgets)
+                    new_allocations = compute_best_bundles_for_all_students(updated_prices.copy(), instance, initial_budgets)
 
                 for new_allocation in new_allocations:
                     if differ_in_one_value(allocation, new_allocation, course):
@@ -804,9 +802,9 @@ def find_min_error_prices(instance: Instance, neighbors: list, initial_budgets: 
     for neighbor in neighbors:
         logger.debug(f"neighbor: {neighbor}")
         if use_threads:
-            allocations = student_best_bundles_with_threads(neighbor.copy(), instance, initial_budgets)
+            allocations = compute_best_bundles_for_all_students_with_threads(neighbor.copy(), instance, initial_budgets)
         else:
-            allocations = student_best_bundles(neighbor.copy(), instance, initial_budgets)
+            allocations = compute_best_bundles_for_all_students(neighbor.copy(), instance, initial_budgets)
         allocation, excess_demand_vector, norma = min_excess_demand_for_allocation(instance, neighbor, allocations)
         logger.debug(f"excess demand: {excess_demand_vector}")
         logger.debug(f"norma = {norma}")
