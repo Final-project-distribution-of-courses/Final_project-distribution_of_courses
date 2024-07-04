@@ -10,7 +10,7 @@ Since: 2024-01
 import logging
 import random
 from itertools import combinations, product
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 import numpy as np
 
