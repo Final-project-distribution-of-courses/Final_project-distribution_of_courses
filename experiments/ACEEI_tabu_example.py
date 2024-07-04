@@ -357,14 +357,14 @@ def run_ariel_experiment():
 RESULTS_THREADS_FILE = "results/comparing_threads_Tabu_Search.csv"
 def run_tread_experiment_Tabu():
     # Remove existing results file if it exists
-    if os.path.exists(RESULTS_THREADS_FILE):
-        os.remove(RESULTS_THREADS_FILE)
+    # if os.path.exists(RESULTS_THREADS_FILE):
+    #     os.remove(RESULTS_THREADS_FILE)
 
     # Run on uniformly-random data with beta and delta parameters:
     experiment = experiments_csv.Experiment("results/", "comparing_threads_Tabu_Search.csv",
                                             backup_folder="results/backup/")
     input_ranges = {
-        "num_of_agents": [20, 25, 30],
+        "num_of_agents": range(20,30),
         "num_of_items": [8, 12],
         "value_noise_ratio": [0, 0.2, 0.4, 0.8, 1],
         "beta": [0.001],
