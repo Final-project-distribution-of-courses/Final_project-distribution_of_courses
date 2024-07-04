@@ -421,7 +421,7 @@ def run_cython_experiment_Tabu():
     experiment = experiments_csv.Experiment("results/", "comparing_cython_Tabu_Search.csv",
                                             backup_folder="results/backup/")
     input_ranges = {
-        "num_of_agents": [35, 40, 43],
+        "num_of_agents": [30,35,40],
         "num_of_items": [8, 12],
         "value_noise_ratio": [0, 0.2, 0.4, 0.8, 1],
         "beta": [0.001],
